@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "type": "object",
+  "properties": {
+    "workload_type": { "enum": ["web_api","batch_job","event_consumer","data_pipeline"] },
+    "region": { "enum": ["us-east4","us-central1","europe-west1","asia-south1"] },
+    "traffic": {
+      "type": "object",
+      "properties": { "rps": { "type": "integer" }, "dau": { "type": "integer" } },
+      "additionalProperties": false
+    },
+    "latency": { "type": "object", "properties": { "p95_ms": { "type": "integer", "default": 500 } } },
+    "budget": { "type": "object", "properties": { "monthly_usd": { "type": "integer", "default": 500 } } },
+    "private_only": { "type": "boolean", "default": true },
+    "db_type": { "enum": ["none","postgres","mysql","firestore","bigtable","redis"] },
+    "ha": { "type": "boolean" },
+    "compliance": { "enum": ["none","hipaa","pci","soc2"], "default": "none" }
+  },
+  "required": ["workload_type","region","traffic","latency","budget","db_type"],
+  "additionalProperties": false
+}
