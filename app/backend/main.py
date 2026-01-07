@@ -1,9 +1,11 @@
+from app.backend.generate_tfvars import render_tfvars
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import ValidationError
 from app.backend.planner.planner import Spec, choose_pattern, derive_settings
 from app.backend.planner.clarifier import clarifying_questions
 from fastapi.middleware.cors import CORSMiddleware
 from app.backend.search import kb_search
+import os
 
 app = FastAPI()
 app.add_middleware(
@@ -14,6 +16,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.post("/generate_tfvars")
+def generate_tfvars(spec_like: dict):
+    # Reuse the plan_explain logic but just call planner pieces directly
+    qs = clarifying_questions(spec_like)
+    if qs and any("requests per second" in str(q) for q in qs):
+        return {"status": "needs_clarification", "clarifying_questions": qs}
+
+    try:
+        spec = Spec(**spec_like)
+    except ValidationError as e:
+        raise HTTPException(status_code=400, detail=e.errors())
+
+    pattern = choose_pattern(spec)
+    settings = derive_settings(spec)
+
+    if pattern != "P1":
+        return {"status": "error", "message": f"Generator currently supports P1 only, got {pattern}"}
+
+    tfvars_text = render_tfvars(spec_like, settings)
+
+    # write it to infra/envs/dev/generated.auto.tfvars (adjust path if needed)
+    out_path = os.path.join("infra", "envs", "dev", "generated.auto.tfvars")
+    with open(out_path, "w") as f:
+        f.write(tfvars_text)
+
+    return {"status": "ok", "pattern": pattern, "path": out_path, "tfvars": tfvars_text}
 @app.get("/search")
 def search(q: str = Query(..., min_length=3), k: int = 5):
     try:
